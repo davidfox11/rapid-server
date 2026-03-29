@@ -58,7 +58,7 @@ LIMIT @page_limit OFFSET @page_offset;
 
 -- name: UpdateBothRatings :exec
 UPDATE users SET rating = CASE
-    WHEN id = @p1_id THEN @p1_rating
-    WHEN id = @p2_id THEN @p2_rating
+    WHEN id = @p1_id THEN @p1_rating::int
+    WHEN id = @p2_id THEN @p2_rating::int
 END
 WHERE id IN (@p1_id, @p2_id);

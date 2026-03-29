@@ -90,6 +90,8 @@ func main() {
 	friendHandler := friend.NewHandler(friendStore, userStore, hub, logger)
 	gameStore := game.NewStore(queries, pool)
 	gameHandler := game.NewHandler(gameStore, userStore, logger)
+	gameStarter := game.NewStarter(gameStore, logger)
+	hub.SetGameStarter(gameStarter)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {

@@ -20,8 +20,8 @@ type ChallengeMsg struct {
 
 type ChallengeRespMsg struct {
 	MatchID      uuid.UUID `json:"match_id"`
-	ChallengerID uuid.UUID `json:"challenger_id"`
-	CategoryID   uuid.UUID `json:"category_id"`
+	ChallengerID string    `json:"challenger_id"`
+	CategoryID   string    `json:"category_id"`
 	Accepted     bool      `json:"accepted"`
 }
 

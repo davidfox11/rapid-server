@@ -731,8 +731,8 @@ func (q *Queries) SearchUsersByUsername(ctx context.Context, dollar_1 pgtype.Tex
 
 const updateBothRatings = `-- name: UpdateBothRatings :exec
 UPDATE users SET rating = CASE
-    WHEN id = $1 THEN $2
-    WHEN id = $3 THEN $4
+    WHEN id = $1 THEN $2::int
+    WHEN id = $3 THEN $4::int
 END
 WHERE id IN ($1, $3)
 `
