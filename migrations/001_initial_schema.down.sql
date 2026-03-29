@@ -1,0 +1,6 @@
+DROP TABLE IF EXISTS match_rounds;
+DROP TABLE IF EXISTS matches;
+DROP TABLE IF EXISTS questions;
+DROP TABLE IF EXISTS categories;
+DROP TABLE IF EXISTS friendships;
+DROP TABLE IF EXISTS users;

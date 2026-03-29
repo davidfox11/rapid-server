@@ -3,6 +3,7 @@ module github.com/rapidtrivia/rapid-server
 go 1.26.1
 
 require (
+	github.com/jackc/pgx/v5 v5.9.1
 	github.com/prometheus/client_golang v1.23.2
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.67.0
 	go.opentelemetry.io/otel v1.42.0
@@ -22,6 +23,8 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.67.5 // indirect
