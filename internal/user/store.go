@@ -16,17 +16,14 @@ import (
 
 var tracer = otel.Tracer("user.store")
 
-// Store wraps sqlc-generated queries with tracing and domain type mapping.
 type Store struct {
 	q *db.Queries
 }
 
-// NewStore creates a new user store.
 func NewStore(q *db.Queries) *Store {
 	return &Store{q: q}
 }
 
-// FindByFirebaseUID looks up a user by their Firebase UID.
 func (s *Store) FindByFirebaseUID(ctx context.Context, uid string) (*User, error) {
 	ctx, span := tracer.Start(ctx, "user.store.FindByFirebaseUID",
 		trace.WithAttributes(attribute.String("firebase_uid", uid)))
@@ -42,7 +39,6 @@ func (s *Store) FindByFirebaseUID(ctx context.Context, uid string) (*User, error
 	return mapUser(row), nil
 }
 
-// FindByID looks up a user by their UUID.
 func (s *Store) FindByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	ctx, span := tracer.Start(ctx, "user.store.FindByID",
 		trace.WithAttributes(attribute.String("user.id", id.String())))
@@ -58,7 +54,6 @@ func (s *Store) FindByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	return mapUser(row), nil
 }
 
-// Create inserts a new user.
 func (s *Store) Create(ctx context.Context, params CreateParams) (*User, error) {
 	ctx, span := tracer.Start(ctx, "user.store.Create",
 		trace.WithAttributes(attribute.String("username", params.Username)))
@@ -76,7 +71,6 @@ func (s *Store) Create(ctx context.Context, params CreateParams) (*User, error) 
 	return mapUser(row), nil
 }
 
-// SearchByUsername finds users whose username starts with the given prefix.
 func (s *Store) SearchByUsername(ctx context.Context, prefix string) ([]User, error) {
 	ctx, span := tracer.Start(ctx, "user.store.SearchByUsername",
 		trace.WithAttributes(attribute.String("prefix", prefix)))
@@ -94,8 +88,6 @@ func (s *Store) SearchByUsername(ctx context.Context, prefix string) ([]User, er
 	return users, nil
 }
 
-// GetBestCategory returns the user's top-performing category.
-// Returns nil if the user has no completed matches.
 func (s *Store) GetBestCategory(ctx context.Context, userID uuid.UUID) (*BestCategory, error) {
 	ctx, span := tracer.Start(ctx, "user.store.GetBestCategory",
 		trace.WithAttributes(attribute.String("user.id", userID.String())))
@@ -121,7 +113,6 @@ func (s *Store) GetBestCategory(ctx context.Context, userID uuid.UUID) (*BestCat
 	}, nil
 }
 
-// CountPendingFriendRequests returns the number of pending friend requests for a user.
 func (s *Store) CountPendingFriendRequests(ctx context.Context, userID uuid.UUID) (int64, error) {
 	ctx, span := tracer.Start(ctx, "user.store.CountPendingFriendRequests",
 		trace.WithAttributes(attribute.String("user.id", userID.String())))
@@ -134,7 +125,6 @@ func (s *Store) CountPendingFriendRequests(ctx context.Context, userID uuid.UUID
 	return count, nil
 }
 
-// UpdateLastSeen updates the user's last_seen_at timestamp to now.
 func (s *Store) UpdateLastSeen(ctx context.Context, userID uuid.UUID) error {
 	ctx, span := tracer.Start(ctx, "user.store.UpdateLastSeen",
 		trace.WithAttributes(attribute.String("user.id", userID.String())))

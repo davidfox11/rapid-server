@@ -12,18 +12,15 @@ import (
 
 var usernameRegex = regexp.MustCompile(`^[a-z0-9_]{3,20}$`)
 
-// Handler handles user-related HTTP requests.
 type Handler struct {
 	store  *Store
 	logger *slog.Logger
 }
 
-// NewHandler creates a new user handler.
 func NewHandler(store *Store, logger *slog.Logger) *Handler {
 	return &Handler{store: store, logger: logger}
 }
 
-// Register handles POST /auth/register.
 func (h *Handler) Register() http.HandlerFunc {
 	type request struct {
 		Username    string  `json:"username"`
@@ -52,7 +49,6 @@ func (h *Handler) Register() http.HandlerFunc {
 			return
 		}
 
-		// Check if Firebase UID already registered.
 		existing, err := h.store.FindByFirebaseUID(r.Context(), uid)
 		if err != nil {
 			h.logger.Error("checking existing user", "error", err, "firebase_uid", uid)
@@ -85,7 +81,6 @@ func (h *Handler) Register() http.HandlerFunc {
 	}
 }
 
-// Me handles GET /auth/me.
 func (h *Handler) Me() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		uid, _ := auth.UserIDFromContext(r.Context())

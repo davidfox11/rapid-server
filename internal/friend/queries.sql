@@ -9,6 +9,11 @@ UPDATE friendships SET status = $1 WHERE id = $2;
 -- name: GetFriendship :one
 SELECT * FROM friendships WHERE id = $1;
 
+-- name: FindFriendshipBetween :one
+SELECT * FROM friendships
+WHERE (requester_id = @user_a AND addressee_id = @user_b)
+   OR (requester_id = @user_b AND addressee_id = @user_a);
+
 -- name: ListAcceptedFriends :many
 SELECT u.* FROM users u
 JOIN friendships f ON (

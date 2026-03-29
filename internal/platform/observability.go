@@ -14,8 +14,6 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// InitObservability sets up the TracerProvider, MeterProvider, and log-trace correlation.
-// Returns a cleanup function that flushes pending spans on shutdown.
 func InitObservability(ctx context.Context, serviceName, otlpEndpoint string) (shutdown func(context.Context) error, err error) {
 	var shutdowns []func(context.Context) error
 
@@ -64,8 +62,6 @@ func InitObservability(ctx context.Context, serviceName, otlpEndpoint string) (s
 	return shutdown, nil
 }
 
-// TraceIDFromContext extracts the trace ID string from a span context.
-// Returns "" if no active span.
 func TraceIDFromContext(ctx context.Context) string {
 	sc := trace.SpanFromContext(ctx).SpanContext()
 	if sc.HasTraceID() {

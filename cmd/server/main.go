@@ -12,6 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rapidtrivia/rapid-server/internal/auth"
 	"github.com/rapidtrivia/rapid-server/internal/db"
+	"github.com/rapidtrivia/rapid-server/internal/friend"
 	"github.com/rapidtrivia/rapid-server/internal/platform"
 	"github.com/rapidtrivia/rapid-server/internal/user"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -34,7 +35,6 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// 1. Observability
 	otelShutdown, err := platform.InitObservability(ctx, serviceName, otlpEndpoint)
 	if err != nil {
 		slog.Error("init observability failed", "error", err)
@@ -46,7 +46,6 @@ func main() {
 		}
 	}()
 
-	// 2. Postgres
 	pool, err := platform.NewPostgresPool(ctx, databaseURL)
 	if err != nil {
 		slog.Error("init postgres failed", "error", err)
@@ -54,7 +53,6 @@ func main() {
 	}
 	defer pool.Close()
 
-	// 3. Redis
 	rdb, err := platform.NewRedisClient(ctx, redisURL)
 	if err != nil {
 		slog.Error("init redis failed", "error", err)
@@ -62,7 +60,6 @@ func main() {
 	}
 	defer rdb.Close()
 
-	// 4. Auth
 	var verifier auth.TokenVerifier
 	switch authMode {
 	case "firebase":
@@ -80,28 +77,28 @@ func main() {
 
 	authMiddleware := auth.Middleware(verifier)
 
-	// 5. Stores and handlers
 	queries := db.New(pool)
 	userStore := user.NewStore(queries)
 	userHandler := user.NewHandler(userStore, logger)
+	friendStore := friend.NewStore(queries)
+	friendHandler := friend.NewHandler(friendStore, userStore, &friend.OfflinePresenceChecker{}, logger)
 
-	// 6. Routes
 	mux := http.NewServeMux()
-
-	// Public routes (no auth)
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	})
 	mux.Handle("GET /metrics", promhttp.Handler())
 
-	// Protected routes (auth required)
 	protected := http.NewServeMux()
 	protected.Handle("POST /auth/register", userHandler.Register())
 	protected.Handle("GET /auth/me", userHandler.Me())
+	protected.Handle("POST /friends/request", friendHandler.Request())
+	protected.Handle("POST /friends/respond", friendHandler.Respond())
+	protected.Handle("GET /friends", friendHandler.List())
+	protected.Handle("GET /friends/search", friendHandler.Search())
 	mux.Handle("/", authMiddleware(protected))
 
-	// 7. HTTP server
 	handler := otelhttp.NewHandler(mux, "http",
 		otelhttp.WithMessageEvents(otelhttp.ReadEvents, otelhttp.WriteEvents),
 	)
@@ -128,7 +125,6 @@ func main() {
 	slog.Info("server stopped")
 }
 
-// withTraceLogging wraps a handler to add trace_id to log context for each request.
 func withTraceLogging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		traceID := platform.TraceIDFromContext(r.Context())

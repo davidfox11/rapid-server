@@ -140,6 +140,30 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
+const findFriendshipBetween = `-- name: FindFriendshipBetween :one
+SELECT id, requester_id, addressee_id, status, created_at FROM friendships
+WHERE (requester_id = $1 AND addressee_id = $2)
+   OR (requester_id = $2 AND addressee_id = $1)
+`
+
+type FindFriendshipBetweenParams struct {
+	UserA pgtype.UUID `json:"user_a"`
+	UserB pgtype.UUID `json:"user_b"`
+}
+
+func (q *Queries) FindFriendshipBetween(ctx context.Context, arg FindFriendshipBetweenParams) (Friendship, error) {
+	row := q.db.QueryRow(ctx, findFriendshipBetween, arg.UserA, arg.UserB)
+	var i Friendship
+	err := row.Scan(
+		&i.ID,
+		&i.RequesterID,
+		&i.AddresseeID,
+		&i.Status,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const findUserByFirebaseUID = `-- name: FindUserByFirebaseUID :one
 SELECT id, firebase_uid, username, display_name, avatar_url, default_avatar_index, rating, rating_week_start, last_seen_at, created_at FROM users WHERE firebase_uid = $1
 `
