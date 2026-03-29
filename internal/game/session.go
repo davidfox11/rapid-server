@@ -71,6 +71,11 @@ type playerAnswer struct {
 	timedOut  bool
 }
 
+type PresenceNotifier interface {
+	SetInMatch(userID uuid.UUID, inMatch bool)
+	BroadcastPresence(ctx context.Context, userID uuid.UUID, status string)
+}
+
 type GameSession struct {
 	matchID    uuid.UUID
 	category   Category
@@ -86,6 +91,7 @@ type GameSession struct {
 	p1AvatarIdx int
 	p2AvatarIdx int
 	store      *Store
+	presence   PresenceNotifier
 	logger     *slog.Logger
 }
 
@@ -104,6 +110,7 @@ type NewSessionParams struct {
 	P1AvatarIdx int
 	P2AvatarIdx int
 	Store       *Store
+	Presence    PresenceNotifier
 	Logger      *slog.Logger
 }
 
@@ -123,6 +130,7 @@ func NewGameSession(p NewSessionParams) *GameSession {
 		p1AvatarIdx: p.P1AvatarIdx,
 		p2AvatarIdx: p.P2AvatarIdx,
 		store:       p.Store,
+		presence:    p.Presence,
 		logger:      p.Logger.With("match_id", p.MatchID),
 	}
 }
@@ -137,7 +145,20 @@ func (gs *GameSession) Run(ctx context.Context) {
 	gamesActive.Add(ctx, 1)
 	defer func() {
 		gamesActive.Add(ctx, -1)
+		if gs.presence != nil {
+			gs.presence.SetInMatch(gs.player1.ID, false)
+			gs.presence.SetInMatch(gs.player2.ID, false)
+			gs.presence.BroadcastPresence(ctx, gs.player1.ID, "online")
+			gs.presence.BroadcastPresence(ctx, gs.player2.ID, "online")
+		}
 	}()
+
+	if gs.presence != nil {
+		gs.presence.SetInMatch(gs.player1.ID, true)
+		gs.presence.SetInMatch(gs.player2.ID, true)
+		gs.presence.BroadcastPresence(ctx, gs.player1.ID, "in_match")
+		gs.presence.BroadcastPresence(ctx, gs.player2.ID, "in_match")
+	}
 
 	gs.logger.Info("game session started",
 		"p1", gs.player1.ID, "p2", gs.player2.ID,

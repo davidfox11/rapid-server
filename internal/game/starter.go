@@ -10,12 +10,13 @@ import (
 )
 
 type Starter struct {
-	store  *Store
-	logger *slog.Logger
+	store    *Store
+	presence PresenceNotifier
+	logger   *slog.Logger
 }
 
-func NewStarter(store *Store, logger *slog.Logger) *Starter {
-	return &Starter{store: store, logger: logger}
+func NewStarter(store *Store, presence PresenceNotifier, logger *slog.Logger) *Starter {
+	return &Starter{store: store, presence: presence, logger: logger}
 }
 
 func (s *Starter) StartGame(ctx context.Context, p1, p2 *ws.Client, p1User, p2User *user.User, categoryID uuid.UUID) {
@@ -61,6 +62,7 @@ func (s *Starter) StartGame(ctx context.Context, p1, p2 *ws.Client, p1User, p2Us
 		P1AvatarIdx: p1User.DefaultAvatarIndex,
 		P2AvatarIdx: p2User.DefaultAvatarIndex,
 		Store:       s.store,
+		Presence:    s.presence,
 		Logger:      s.logger,
 	})
 

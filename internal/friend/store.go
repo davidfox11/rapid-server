@@ -105,6 +105,22 @@ func (s *Store) ListAcceptedFriends(ctx context.Context, userID uuid.UUID) ([]db
 	return rows, nil
 }
 
+func (s *Store) ListAcceptedFriendIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error) {
+	ctx, span := tracer.Start(ctx, "friend.store.ListAcceptedFriendIDs",
+		trace.WithAttributes(attribute.String("user.id", userID.String())))
+	defer span.End()
+
+	rows, err := s.q.ListAcceptedFriends(ctx, pgUUID(userID))
+	if err != nil {
+		return nil, fmt.Errorf("listing accepted friend ids: %w", err)
+	}
+	ids := make([]uuid.UUID, len(rows))
+	for i, row := range rows {
+		ids[i] = row.ID.Bytes
+	}
+	return ids, nil
+}
+
 func (s *Store) ListPendingRequests(ctx context.Context, userID uuid.UUID) ([]PendingRequest, error) {
 	ctx, span := tracer.Start(ctx, "friend.store.ListPendingRequests",
 		trace.WithAttributes(attribute.String("user.id", userID.String())))

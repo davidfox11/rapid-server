@@ -81,17 +81,18 @@ func main() {
 
 	queries := db.New(pool)
 	userStore := user.NewStore(queries)
-	userHandler := user.NewHandler(userStore, logger)
+	friendStore := friend.NewStore(queries)
+	gameStore := game.NewStore(queries, pool)
 
-	hub := ws.NewHub(logger, userStore)
+	hub := ws.NewHub(logger, userStore, friendStore)
 	go hub.Run(ctx)
 
-	friendStore := friend.NewStore(queries)
-	friendHandler := friend.NewHandler(friendStore, userStore, hub, logger)
-	gameStore := game.NewStore(queries, pool)
-	gameHandler := game.NewHandler(gameStore, userStore, logger)
-	gameStarter := game.NewStarter(gameStore, logger)
+	gameStarter := game.NewStarter(gameStore, hub, logger)
 	hub.SetGameStarter(gameStarter)
+
+	userHandler := user.NewHandler(userStore, logger)
+	friendHandler := friend.NewHandler(friendStore, userStore, hub, logger)
+	gameHandler := game.NewHandler(gameStore, userStore, logger)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {

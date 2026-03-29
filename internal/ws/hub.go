@@ -15,10 +15,14 @@ import (
 	"go.opentelemetry.io/otel/metric"
 )
 
-// GameStarter is satisfied by the game package to avoid an import cycle.
-// The hub calls this when a challenge is accepted.
 type GameStarter interface {
 	StartGame(ctx context.Context, p1, p2 *Client, p1User, p2User *user.User, categoryID uuid.UUID)
+}
+
+// FriendLister returns accepted friend user IDs for presence broadcasting.
+// Satisfied by friend.Store — avoids importing the friend package.
+type FriendLister interface {
+	ListAcceptedFriendIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
 }
 
 type pendingChallenge struct {
@@ -27,25 +31,32 @@ type pendingChallenge struct {
 	matchID      uuid.UUID
 }
 
+type clientState struct {
+	client  *Client
+	inMatch bool
+}
+
 type Hub struct {
-	clients           map[uuid.UUID]*Client
+	clients           map[uuid.UUID]*clientState
 	register          chan *Client
 	unregister        chan *Client
 	mu                sync.RWMutex
 	logger            *slog.Logger
 	userStore         *user.Store
-	pendingChallenges map[uuid.UUID]*pendingChallenge // keyed by matchID
+	friendLister      FriendLister
+	pendingChallenges map[uuid.UUID]*pendingChallenge
 	challengeMu       sync.Mutex
 	gameStarter       GameStarter
 }
 
-func NewHub(logger *slog.Logger, userStore *user.Store) *Hub {
+func NewHub(logger *slog.Logger, userStore *user.Store, friendLister FriendLister) *Hub {
 	return &Hub{
-		clients:           make(map[uuid.UUID]*Client),
+		clients:           make(map[uuid.UUID]*clientState),
 		register:          make(chan *Client),
 		unregister:        make(chan *Client),
 		logger:            logger,
 		userStore:         userStore,
+		friendLister:      friendLister,
 		pendingChallenges: make(map[uuid.UUID]*pendingChallenge),
 	}
 }
@@ -59,22 +70,25 @@ func (h *Hub) Run(ctx context.Context) {
 		select {
 		case client := <-h.register:
 			h.mu.Lock()
-			h.clients[client.ID] = client
+			h.clients[client.ID] = &clientState{client: client}
 			h.mu.Unlock()
 			connectionsActive.Add(ctx, 1)
 			connectionsTotal.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "connected")))
 			h.logger.Info("client connected", "user_id", client.ID)
+			go h.BroadcastPresence(ctx, client.ID, "online")
 
 		case client := <-h.unregister:
 			h.mu.Lock()
 			if _, ok := h.clients[client.ID]; ok {
 				delete(h.clients, client.ID)
 				close(client.Send)
+				close(client.GameCh)
 			}
 			h.mu.Unlock()
 			connectionsActive.Add(ctx, -1)
 			connectionsTotal.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "disconnected")))
 			h.logger.Info("client disconnected", "user_id", client.ID)
+			go h.BroadcastPresence(ctx, client.ID, "offline")
 
 			if h.userStore != nil {
 				_ = h.userStore.UpdateLastSeen(ctx, client.ID)
@@ -89,17 +103,64 @@ func (h *Hub) Run(ctx context.Context) {
 func (h *Hub) GetClient(userID uuid.UUID) *Client {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	return h.clients[userID]
+	if cs, ok := h.clients[userID]; ok {
+		return cs.client
+	}
+	return nil
 }
 
 func (h *Hub) GetPresence(userID uuid.UUID) string {
 	h.mu.RLock()
-	_, connected := h.clients[userID]
+	cs, ok := h.clients[userID]
 	h.mu.RUnlock()
-	if connected {
-		return "online"
+	if !ok {
+		return "offline"
 	}
-	return "offline"
+	if cs.inMatch {
+		return "in_match"
+	}
+	return "online"
+}
+
+func (h *Hub) SetInMatch(userID uuid.UUID, inMatch bool) {
+	h.mu.Lock()
+	if cs, ok := h.clients[userID]; ok {
+		cs.inMatch = inMatch
+	}
+	h.mu.Unlock()
+}
+
+func (h *Hub) BroadcastPresence(ctx context.Context, userID uuid.UUID, status string) {
+	if h.friendLister == nil {
+		return
+	}
+
+	friendIDs, err := h.friendLister.ListAcceptedFriendIDs(ctx, userID)
+	if err != nil {
+		h.logger.Debug("failed to list friends for presence broadcast", "error", err, "user_id", userID)
+		return
+	}
+
+	data, err := NewEnvelope("friend_presence", FriendPresenceMsg{
+		UserID: userID,
+		Status: status,
+	})
+	if err != nil {
+		return
+	}
+
+	h.mu.RLock()
+	for _, fid := range friendIDs {
+		if cs, ok := h.clients[fid]; ok {
+			select {
+			case cs.client.Send <- data:
+			default:
+			}
+		}
+	}
+	h.mu.RUnlock()
+
+	h.logger.Debug("presence broadcast", "user_id", userID, "status", status, "friends_notified", len(friendIDs))
 }
 
 func (h *Hub) handleMessage(from *Client, env Envelope) {
