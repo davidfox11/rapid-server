@@ -11,7 +11,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rapidtrivia/rapid-server/internal/auth"
+	"github.com/rapidtrivia/rapid-server/internal/db"
 	"github.com/rapidtrivia/rapid-server/internal/platform"
+	"github.com/rapidtrivia/rapid-server/internal/user"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
@@ -78,7 +80,12 @@ func main() {
 
 	authMiddleware := auth.Middleware(verifier)
 
-	// 5. Routes
+	// 5. Stores and handlers
+	queries := db.New(pool)
+	userStore := user.NewStore(queries)
+	userHandler := user.NewHandler(userStore, logger)
+
+	// 6. Routes
 	mux := http.NewServeMux()
 
 	// Public routes (no auth)
@@ -90,14 +97,11 @@ func main() {
 
 	// Protected routes (auth required)
 	protected := http.NewServeMux()
-	protected.HandleFunc("GET /auth/me", func(w http.ResponseWriter, r *http.Request) {
-		uid, _ := auth.UserIDFromContext(r.Context())
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"uid": uid})
-	})
+	protected.Handle("POST /auth/register", userHandler.Register())
+	protected.Handle("GET /auth/me", userHandler.Me())
 	mux.Handle("/", authMiddleware(protected))
 
-	// 6. HTTP server
+	// 7. HTTP server
 	handler := otelhttp.NewHandler(mux, "http",
 		otelhttp.WithMessageEvents(otelhttp.ReadEvents, otelhttp.WriteEvents),
 	)
