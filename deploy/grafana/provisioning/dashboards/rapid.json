@@ -1,0 +1,9 @@
+{
+  "dashboard": {
+    "title": "Rapid Server",
+    "uid": "rapid-server",
+    "panels": [],
+    "schemaVersion": 39,
+    "version": 0
+  }
+}

@@ -1,2 +1,8 @@
 apiVersion: 1
-providers: []
+providers:
+  - name: 'Rapid'
+    folder: 'Rapid'
+    type: file
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false
