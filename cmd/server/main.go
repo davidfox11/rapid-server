@@ -13,6 +13,7 @@ import (
 	"github.com/rapidtrivia/rapid-server/internal/auth"
 	"github.com/rapidtrivia/rapid-server/internal/db"
 	"github.com/rapidtrivia/rapid-server/internal/friend"
+	"github.com/rapidtrivia/rapid-server/internal/game"
 	"github.com/rapidtrivia/rapid-server/internal/platform"
 	"github.com/rapidtrivia/rapid-server/internal/user"
 	"github.com/rapidtrivia/rapid-server/internal/ws"
@@ -87,6 +88,8 @@ func main() {
 
 	friendStore := friend.NewStore(queries)
 	friendHandler := friend.NewHandler(friendStore, userStore, hub, logger)
+	gameStore := game.NewStore(queries, pool)
+	gameHandler := game.NewHandler(gameStore, userStore, logger)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
@@ -102,6 +105,9 @@ func main() {
 	protected.Handle("POST /friends/respond", friendHandler.Respond())
 	protected.Handle("GET /friends", friendHandler.List())
 	protected.Handle("GET /friends/search", friendHandler.Search())
+	protected.Handle("GET /categories", gameHandler.ListCategories())
+	protected.Handle("GET /matches", gameHandler.ListMatches())
+	protected.Handle("GET /matches/{id}", gameHandler.GetMatch())
 	protected.HandleFunc("GET /ws", hub.HandleWebSocket)
 	mux.Handle("/", authMiddleware(protected))
 

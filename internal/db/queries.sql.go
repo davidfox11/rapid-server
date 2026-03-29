@@ -291,6 +291,53 @@ func (q *Queries) GetH2HRecord(ctx context.Context, arg GetH2HRecordParams) (Get
 	return i, err
 }
 
+const getMatch = `-- name: GetMatch :one
+SELECT m.id, m.category_id, m.player1_id, m.player2_id, m.player1_score, m.player2_score, m.winner_id, m.status, m.created_at, m.completed_at, c.name as category_name,
+       u1.username as player1_username, u2.username as player2_username
+FROM matches m
+JOIN categories c ON c.id = m.category_id
+JOIN users u1 ON u1.id = m.player1_id
+JOIN users u2 ON u2.id = m.player2_id
+WHERE m.id = $1
+`
+
+type GetMatchRow struct {
+	ID              pgtype.UUID        `json:"id"`
+	CategoryID      pgtype.UUID        `json:"category_id"`
+	Player1ID       pgtype.UUID        `json:"player1_id"`
+	Player2ID       pgtype.UUID        `json:"player2_id"`
+	Player1Score    int32              `json:"player1_score"`
+	Player2Score    int32              `json:"player2_score"`
+	WinnerID        pgtype.UUID        `json:"winner_id"`
+	Status          string             `json:"status"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	CompletedAt     pgtype.Timestamptz `json:"completed_at"`
+	CategoryName    string             `json:"category_name"`
+	Player1Username string             `json:"player1_username"`
+	Player2Username string             `json:"player2_username"`
+}
+
+func (q *Queries) GetMatch(ctx context.Context, id pgtype.UUID) (GetMatchRow, error) {
+	row := q.db.QueryRow(ctx, getMatch, id)
+	var i GetMatchRow
+	err := row.Scan(
+		&i.ID,
+		&i.CategoryID,
+		&i.Player1ID,
+		&i.Player2ID,
+		&i.Player1Score,
+		&i.Player2Score,
+		&i.WinnerID,
+		&i.Status,
+		&i.CreatedAt,
+		&i.CompletedAt,
+		&i.CategoryName,
+		&i.Player1Username,
+		&i.Player2Username,
+	)
+	return i, err
+}
+
 const getMatchWithRounds = `-- name: GetMatchWithRounds :many
 SELECT mr.id, mr.match_id, mr.round_number, mr.question_id, mr.p1_choice, mr.p1_correct, mr.p1_time_ms, mr.p1_points, mr.p2_choice, mr.p2_correct, mr.p2_time_ms, mr.p2_points, q.question_text, q.options, q.correct_index
 FROM match_rounds mr

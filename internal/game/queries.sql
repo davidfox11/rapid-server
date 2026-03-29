@@ -4,6 +4,15 @@ SELECT * FROM categories ORDER BY name;
 -- name: GetCategory :one
 SELECT * FROM categories WHERE id = $1;
 
+-- name: GetMatch :one
+SELECT m.*, c.name as category_name,
+       u1.username as player1_username, u2.username as player2_username
+FROM matches m
+JOIN categories c ON c.id = m.category_id
+JOIN users u1 ON u1.id = m.player1_id
+JOIN users u2 ON u2.id = m.player2_id
+WHERE m.id = $1;
+
 -- name: LoadRandomQuestions :many
 SELECT * FROM questions
 WHERE category_id = $1
