@@ -15,6 +15,7 @@ import (
 	"github.com/rapidtrivia/rapid-server/internal/friend"
 	"github.com/rapidtrivia/rapid-server/internal/platform"
 	"github.com/rapidtrivia/rapid-server/internal/user"
+	"github.com/rapidtrivia/rapid-server/internal/ws"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
@@ -80,8 +81,12 @@ func main() {
 	queries := db.New(pool)
 	userStore := user.NewStore(queries)
 	userHandler := user.NewHandler(userStore, logger)
+
+	hub := ws.NewHub(logger, userStore)
+	go hub.Run(ctx)
+
 	friendStore := friend.NewStore(queries)
-	friendHandler := friend.NewHandler(friendStore, userStore, &friend.OfflinePresenceChecker{}, logger)
+	friendHandler := friend.NewHandler(friendStore, userStore, hub, logger)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
@@ -97,6 +102,7 @@ func main() {
 	protected.Handle("POST /friends/respond", friendHandler.Respond())
 	protected.Handle("GET /friends", friendHandler.List())
 	protected.Handle("GET /friends/search", friendHandler.Search())
+	protected.HandleFunc("GET /ws", hub.HandleWebSocket)
 	mux.Handle("/", authMiddleware(protected))
 
 	handler := otelhttp.NewHandler(mux, "http",
