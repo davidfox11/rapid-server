@@ -1,0 +1,70 @@
+services:
+  server:
+    build: .
+    ports: ["8080:8080"]
+    environment:
+      DATABASE_URL: postgres://rapid:rapid@postgres:5432/rapid?sslmode=disable
+      REDIS_URL: redis://redis:6379
+      LOG_LEVEL: debug
+      OTEL_EXPORTER_OTLP_ENDPOINT: tempo:4317
+      OTEL_SERVICE_NAME: rapid-server
+      METRICS_ENABLED: "true"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_started }
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: rapid
+      POSTGRES_PASSWORD: rapid
+      POSTGRES_DB: rapid
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rapid"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes: [./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml]
+    ports: ["9090:9090"]
+
+  tempo:
+    image: grafana/tempo:latest
+    volumes: [./deploy/tempo/tempo.yaml:/etc/tempo/tempo.yaml]
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    ports: ["4317:4317", "3200:3200"]
+
+  loki:
+    image: grafana/loki:latest
+    volumes: [./deploy/loki/loki.yaml:/etc/loki/loki.yaml]
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    ports: ["3100:3100"]
+
+  promtail:
+    image: grafana/promtail:latest
+    volumes:
+      - ./deploy/promtail/promtail.yaml:/etc/promtail/promtail.yaml
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: ["-config.file=/etc/promtail/promtail.yaml"]
+
+  grafana:
+    image: grafana/grafana:latest
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning
+      - ./deploy/grafana/grafana.ini:/etc/grafana/grafana.ini
+    ports: ["3000:3000"]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: rapid
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+
+volumes:
+  pgdata:
